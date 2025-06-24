@@ -1,22 +1,974 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="styles.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus App</title>
-        <script type="module" src="/main.js" defer></script>
-    </head>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABB差动保护校验工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    <body>
-        <main class="container">
-            <h1>Welcome to PakePlus</h1>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
 
-            <form class="row" id="greet-form">
-                <input id="greet-input" placeholder="Enter a name..." />
-                <button type="submit">Greet</button>
-            </form>
-            <p id="greet-msg"></p>
-        </main>
-    </body>
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        .panel-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        .radio-item:hover {
+            background: #f8f9fa;
+        }
+
+        .radio-item input[type="radio"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            border-left: 5px solid #667eea;
+        }
+
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .result-content {
+            white-space: pre-line;
+            font-family: 'Courier New', monospace;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .error {
+            background: #fff5f5;
+            border-left-color: #e53e3e;
+            color: #e53e3e;
+        }
+
+        .success {
+            background: #f0fff4;
+            border-left-color: #38a169;
+            color: #38a169;
+        }
+
+        .selected-point-display {
+            background: #e8f4f8;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 2px solid #667eea;
+        }
+
+        .selected-point-info {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .chart-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .chart-modal-content {
+            background: white;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 900px;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-modal-header h3 {
+            color: #333;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 5px;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .chart-container {
+            flex: 1;
+            padding: 20px;
+            position: relative;
+        }
+
+        .chart-container canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .chart-modal-footer {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+
+        .chart-modal-footer p {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-modal-content {
+                width: 95%;
+                height: 85%;
+            }
+
+            .chart-container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ ABB差动保护校验工具</h1>
+            <p>SPAD346C差动综合保护器特性曲线校验辅助工具</p>
+        </div>
+
+        <div class="grid-container">
+            <!-- 曲线定值面板 -->
+            <div class="panel">
+                <div class="panel-title">📈 曲线定值</div>
+                <div class="form-group">
+                    <label for="P_IN">差动启动电流倍数 (P_IN):</label>
+                    <input type="number" id="P_IN" name="P_IN" value="0.36" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="S">制动斜率 (S):</label>
+                    <input type="number" id="S" name="S" value="0.44" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="I2TP">拐点电流倍数 (I2TP):</label>
+                    <input type="number" id="I2TP" name="I2TP" value="2.1" step="0.1" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="ID_IN_HIGH_SET">高设定 (ID_IN_HIGH_SET):</label>
+                    <input type="number" id="ID_IN_HIGH_SET" name="ID_IN_HIGH_SET" value="6" step="0.1" min="0">
+                </div>
+            </div>
+
+            <!-- 现场配置面板 -->
+            <div class="panel">
+                <div class="panel-title">📊 现场配置</div>
+                <div class="form-group">
+                    <label for="IN">保护器额定电流 (IN):</label>
+                    <input type="number" id="IN" name="IN" value="5" step="0.1" min="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="K1">高压侧变比校正系数 (K1):</label>
+                    <input type="number" id="K1" name="K1" value="0.7" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="K2">低压侧变比校正系数 (K2):</label>
+                    <input type="number" id="K2" name="K2" value="0.92" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="direction_choice">高低压电流方向:</label>
+                    <select id="direction_choice" name="direction_choice">
+                        <option value="相同">相同方向（一期总变）</option>
+                        <option value="相反" selected>相反方向（二期总变）</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 校验选择面板 -->
+            <div class="panel">
+                <div class="panel-title">⚡ 校验选择</div>
+                <div class="form-group">
+                    <label>校验模式:</label>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" id="single_phase" name="calibration_mode" value="single_phase" checked>
+                            <label for="single_phase">分相校验</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" id="three_phase" name="calibration_mode" value="three_phase">
+                            <label for="three_phase">三相校验</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group" id="phase_selection">
+                    <label>选择校验相别:</label>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" id="phase_A" name="selected_phase" value="A" checked>
+                            <label for="phase_A">A相</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" id="phase_B" name="selected_phase" value="B">
+                            <label for="phase_B">B相</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" id="phase_C" name="selected_phase" value="C">
+                            <label for="phase_C">C相</label>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn" id="selectPointButton" onclick="selectPoint()">选择校验点</button>
+                
+                <div id="selectedPointDisplay" class="selected-point-display hidden">
+                    <div class="selected-point-info" id="selectedPointInfo"></div>
+                    <button class="btn" id="getResultsButton" onclick="getResults()">计算校验结果</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 校验结果面板 -->
+        <div class="panel">
+            <div class="panel-title">📋 校验结果</div>
+            
+            <div class="result-box">
+                <div class="result-title">校验电流</div>
+                <div class="result-content" id="calibrationCurrentsBox">请先选择校验点并计算结果</div>
+            </div>
+            
+            <div class="result-box">
+                <div class="result-title">保护器显示电流</div>
+                <div class="result-content" id="relayDisplayCurrentsBox">请先选择校验点并计算结果</div>
+            </div>
+            
+            <div class="result-box hidden" id="selectedPointInfoOutput">
+                <div class="result-title">选取点信息</div>
+                <div class="result-content" id="selectedPointInfoContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script>
+        // 全局变量存储选中的点
+        let selectedIbIn = null;
+        let selectedIdIn = null;
+        let currentChart = null;
+        let chartModal = null;
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            updateUIVisibility();
+            createChartModal();
+            
+            // 监听校验模式变化
+            document.querySelectorAll('input[name="calibration_mode"]').forEach(radio => {
+                radio.addEventListener('change', updateUIVisibility);
+            });
+        });
+
+        // 创建图表模态框
+        function createChartModal() {
+            const modalHTML = `
+                <div id="chartModal" class="chart-modal hidden">
+                    <div class="chart-modal-content">
+                        <div class="chart-modal-header">
+                            <h3>差动保护特性曲线</h3>
+                            <button class="close-btn" onclick="closeChartModal()">&times;</button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="characteristicChart"></canvas>
+                        </div>
+                        <div class="chart-modal-footer">
+                            <p>点击曲线上的点来选择校验点</p>
+                            <button class="btn" onclick="closeChartModal()">取消选择</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            chartModal = document.getElementById('chartModal');
+        }
+
+        // 更新UI可见性
+        function updateUIVisibility() {
+            const calibrationMode = document.querySelector('input[name="calibration_mode"]:checked').value;
+            const phaseSelection = document.getElementById('phase_selection');
+            
+            if (calibrationMode === 'single_phase') {
+                phaseSelection.classList.remove('hidden');
+            } else {
+                phaseSelection.classList.add('hidden');
+            }
+        }
+
+        // 归一化角度到[-180, 180]
+        function normalizeAngle(angle) {
+            while (angle > 180) angle -= 360;
+            while (angle <= -180) angle += 360;
+            return angle;
+        }
+
+        // 计算差动特性曲线
+        function getIdIn(IbIn, P_IN, S, I2TP, ID_IN_HIGH_SET) {
+            if (IbIn < 0) return 0;
+            if (IbIn <= 0.5) return P_IN;
+            if (IbIn <= I2TP) return P_IN + S * (IbIn - 0.5);
+            
+            const IdAtI2TP = P_IN + S * (I2TP - 0.5);
+            const calculated = IdAtI2TP + 1 * (IbIn - I2TP);
+            return Math.min(calculated, ID_IN_HIGH_SET);
+        }
+
+        // 生成曲线数据
+        function generateCurveData(P_IN, S, I2TP, ID_IN_HIGH_SET) {
+            const maxX = Math.max(I2TP * 1.5, ID_IN_HIGH_SET * 1.2, 5);
+            const points = [];
+            const numPoints = 500;
+            
+            for (let i = 0; i <= numPoints; i++) {
+                const IbIn = (i / numPoints) * maxX;
+                const IdIn = getIdIn(IbIn, P_IN, S, I2TP, ID_IN_HIGH_SET);
+                points.push({ x: IbIn, y: IdIn });
+            }
+            
+            return points;
+        }
+
+        // 生成辅助线数据
+        function generateAuxiliaryLines(P_IN, I2TP, ID_IN_HIGH_SET, maxX) {
+            return {
+                P_IN_line: [
+                    { x: 0, y: P_IN },
+                    { x: 0.5, y: P_IN }
+                ],
+                vertical_05: [
+                    { x: 0.5, y: 0 },
+                    { x: 0.5, y: Math.max(P_IN, ID_IN_HIGH_SET) }
+                ],
+                vertical_I2TP: [
+                    { x: I2TP, y: 0 },
+                    { x: I2TP, y: Math.max(P_IN, ID_IN_HIGH_SET) }
+                ],
+                horizontal_high_set: [
+                    { x: 0, y: ID_IN_HIGH_SET },
+                    { x: maxX, y: ID_IN_HIGH_SET }
+                ]
+            };
+        }
+
+        // 绘制特性曲线
+        function selectPoint() {
+            const button = document.getElementById('selectPointButton');
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> 生成特性曲线...';
+
+            try {
+                // 获取曲线定值参数
+                const P_IN = parseFloat(document.getElementById('P_IN').value);
+                const S = parseFloat(document.getElementById('S').value);
+                const I2TP = parseFloat(document.getElementById('I2TP').value);
+                const ID_IN_HIGH_SET = parseFloat(document.getElementById('ID_IN_HIGH_SET').value);
+
+                // 验证参数
+                if (isNaN(P_IN) || isNaN(S) || isNaN(I2TP) || isNaN(ID_IN_HIGH_SET)) {
+                    throw new Error('请输入有效的数值参数');
+                }
+
+                // 生成曲线数据
+                const curveData = generateCurveData(P_IN, S, I2TP, ID_IN_HIGH_SET);
+                const maxX = Math.max(I2TP * 1.5, ID_IN_HIGH_SET * 1.2, 5);
+                const auxiliaryLines = generateAuxiliaryLines(P_IN, I2TP, ID_IN_HIGH_SET, maxX);
+
+                // 显示模态框
+                chartModal.classList.remove('hidden');
+
+                // 创建图表
+                const ctx = document.getElementById('characteristicChart').getContext('2d');
+                
+                // 销毁现有图表
+                if (currentChart) {
+                    currentChart.destroy();
+                }
+
+                currentChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: '差动特性曲线',
+                                data: curveData,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                borderWidth: 3,
+                                fill: false,
+                                pointRadius: 0,
+                                pointHoverRadius: 6,
+                                tension: 0
+                            },
+                            {
+                                label: 'P_IN线',
+                                data: auxiliaryLines.P_IN_line,
+                                borderColor: 'rgb(255, 99, 132)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                pointRadius: 0,
+                                showLine: true
+                            },
+                            {
+                                label: '0.5线',
+                                data: auxiliaryLines.vertical_05,
+                                borderColor: 'rgb(255, 206, 86)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                pointRadius: 0,
+                                showLine: true
+                            },
+                            {
+                                label: 'I2TP线',
+                                data: auxiliaryLines.vertical_I2TP,
+                                borderColor: 'rgb(54, 162, 235)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                pointRadius: 0,
+                                showLine: true
+                            },
+                            {
+                                label: '高设定线',
+                                data: auxiliaryLines.horizontal_high_set,
+                                borderColor: 'rgb(153, 102, 255)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                pointRadius: 0,
+                                showLine: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'nearest'
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'bottom',
+                                title: {
+                                    display: true,
+                                    text: 'Ib/In (制动电流倍数)'
+                                },
+                                grid: {
+                                    display: true
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Id/In (差动电流倍数)'
+                                },
+                                grid: {
+                                    display: true
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'ABB SPAD346C 差动保护特性曲线'
+                            },
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        },
+                        onClick: (event, elements) => {
+                            if (elements.length > 0) {
+                                const element = elements[0];
+                                if (element.datasetIndex === 0) { // 只响应主曲线的点击
+                                    const point = curveData[element.index];
+                                    selectPointOnCurve(point.x, point.y, P_IN, S, I2TP, ID_IN_HIGH_SET);
+                                }
+                            } else {
+                                // 点击空白区域，计算最近的曲线点
+                                const canvasPosition = Chart.helpers.getRelativePosition(event, currentChart);
+                                const dataX = currentChart.scales.x.getValueForPixel(canvasPosition.x);
+                                const dataY = currentChart.scales.y.getValueForPixel(canvasPosition.y);
+                                
+                                if (dataX >= 0 && dataX <= maxX) {
+                                    const calculatedY = getIdIn(dataX, P_IN, S, I2TP, ID_IN_HIGH_SET);
+                                    selectPointOnCurve(dataX, calculatedY, P_IN, S, I2TP, ID_IN_HIGH_SET);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                button.disabled = false;
+                button.innerHTML = '重新选择校验点';
+
+            } catch (error) {
+                console.error('生成曲线错误:', error);
+                alert('生成曲线时发生错误：' + error.message);
+                button.disabled = false;
+                button.innerHTML = '选择校验点';
+            }
+        }
+
+        // 在曲线上选择点
+        function selectPointOnCurve(IbIn, IdIn, P_IN, S, I2TP, ID_IN_HIGH_SET) {
+            // 确保点在曲线上
+            const correctedIdIn = getIdIn(IbIn, P_IN, S, I2TP, ID_IN_HIGH_SET);
+            
+            selectedIbIn = IbIn;
+            selectedIdIn = correctedIdIn;
+
+            // 在图表上添加选中点的标记
+            if (currentChart) {
+                // 添加选中点数据集
+                const selectedPointData = [{ x: selectedIbIn, y: selectedIdIn }];
+                
+                // 移除之前的选中点
+                currentChart.data.datasets = currentChart.data.datasets.filter(dataset => 
+                    dataset.label !== '选中点'
+                );
+                
+                // 添加新的选中点
+                currentChart.data.datasets.push({
+                    label: '选中点',
+                    data: selectedPointData,
+                    backgroundColor: 'rgb(255, 0, 0)',
+                    borderColor: 'rgb(255, 0, 0)',
+                    pointRadius: 8,
+                    pointHoverRadius: 10,
+                    showLine: false
+                });
+                
+                currentChart.update();
+            }
+
+            // 更新选中点信息
+            document.getElementById('selectedPointInfo').textContent = 
+                `已选择校验点: Ib/In = ${selectedIbIn.toFixed(3)}, Id/In = ${selectedIdIn.toFixed(3)}`;
+            
+            // 关闭模态框并显示结果区域
+            setTimeout(() => {
+                closeChartModal();
+                document.getElementById('selectedPointDisplay').classList.remove('hidden');
+            }, 1000);
+        }
+
+        // 关闭图表模态框
+        function closeChartModal() {
+            chartModal.classList.add('hidden');
+            if (currentChart) {
+                currentChart.destroy();
+                currentChart = null;
+            }
+        }
+
+        // 计算通用电流
+        function calculateCommonCurrents(selectedIbIn, selectedIdIn, IN, K1, K2) {
+            const I1 = (2 * selectedIbIn + selectedIdIn) * IN / 2;
+            const I2 = (2 * selectedIbIn - selectedIdIn) * IN / 2;
+            const I1_prime = I1 * K1;
+            const I2_prime = I2 * K2;
+            
+            return { I1, I2, I1_prime, I2_prime };
+        }
+
+        // 计算分相校验电流
+        function calculateSinglePhaseTestCurrents(selectedIbIn, selectedIdIn, directionChoice, IN, K1, K2, selectedPhase) {
+            const { I1, I2, I1_prime, I2_prime } = calculateCommonCurrents(selectedIbIn, selectedIdIn, IN, K1, K2);
+            
+            const HV_test_mag = I1_prime * Math.sqrt(3);
+            const LV_test_mag = I2_prime;
+            const LV_aux_mag = I1 * K2;
+
+            let hv_phase_angle = 0;
+            let lv_phase_angle = 180;
+            let lv_aux_phase_angle = 0;
+
+            // 根据相别调整相角
+            if (selectedPhase === 'B') {
+                hv_phase_angle = normalizeAngle(hv_phase_angle - 120);
+                lv_phase_angle = normalizeAngle(lv_phase_angle - 120);
+                lv_aux_phase_angle = normalizeAngle(lv_aux_phase_angle - 120);
+            } else if (selectedPhase === 'C') {
+                hv_phase_angle = normalizeAngle(hv_phase_angle + 120);
+                lv_phase_angle = normalizeAngle(lv_phase_angle + 120);
+                lv_aux_phase_angle = normalizeAngle(lv_aux_phase_angle + 120);
+            }
+
+            const phaseMap = { 'A': 'A', 'B': 'B', 'C': 'C' };
+            const auxPhaseMap = { 'A': 'c', 'B': 'a', 'C': 'b' };
+            const lowPhaseMap = { 'A': 'a', 'B': 'b', 'C': 'c' };
+
+            return `分相校验时做${selectedPhase}相试验加的电流:
+高压侧${phaseMap[selectedPhase]}相试验加电流 I${phaseMap[selectedPhase]}: ${HV_test_mag.toFixed(2)}A ∠${hv_phase_angle}°
+低压侧${lowPhaseMap[selectedPhase]}相试验加电流 I${lowPhaseMap[selectedPhase]}: ${LV_test_mag.toFixed(2)}A ∠${lv_phase_angle}°
+低压侧${auxPhaseMap[selectedPhase]}相辅助试验加电流 I${auxPhaseMap[selectedPhase]}: ${LV_aux_mag.toFixed(2)}A ∠${lv_aux_phase_angle}°`;
+        }
+
+        // 计算三相校验电流
+        function calculateThreePhaseTestCurrents(selectedIbIn, selectedIdIn, directionChoice, IN, K1, K2) {
+            const { I1, I2, I1_prime, I2_prime } = calculateCommonCurrents(selectedIbIn, selectedIdIn, IN, K1, K2);
+            
+            const HV_A_mag = I1_prime;
+            const HV_B_mag = I1_prime;
+            const HV_C_mag = I1_prime;
+            const LV_a_mag = I2_prime;
+            const LV_b_mag = I2_prime;
+            const LV_c_mag = I2_prime;
+
+            // 高压侧相角（正相序）
+            const HV_phase_A = 0;
+            const HV_phase_B = -120;
+            const HV_phase_C = 120;
+
+            // 低压侧相角
+            let base_phase_shift_lv_to_hv = -150;
+            if (directionChoice === '相同') {
+                base_phase_shift_lv_to_hv += 180;
+            }
+
+            const LV_phase_a = normalizeAngle(0 + base_phase_shift_lv_to_hv);
+            const LV_phase_b = normalizeAngle(-120 + base_phase_shift_lv_to_hv);
+            const LV_phase_c = normalizeAngle(120 + base_phase_shift_lv_to_hv);
+
+            return `三相一起做校验电流:
+高压侧试验电流：
+IA: ${HV_A_mag.toFixed(2)}A ∠${HV_phase_A}°
+IB: ${HV_B_mag.toFixed(2)}A ∠${HV_phase_B}°
+IC: ${HV_C_mag.toFixed(2)}A ∠${HV_phase_C}°
+
+低压侧试验电流：
+Ia: ${LV_a_mag.toFixed(2)}A ∠${LV_phase_a}°
+Ib: ${LV_b_mag.toFixed(2)}A ∠${LV_phase_b}°
+Ic: ${LV_c_mag.toFixed(2)}A ∠${LV_phase_c}°`;
+        }
+
+        // 格式化保护器显示电流
+        function formatRelayDisplayCurrents(calibrationMode, selectedPhase, I1, I2, IN, selectedIdIn) {
+            const I1_per_In = I1 / IN;
+            const I2_per_In = I2 / IN;
+            const Id_per_In = selectedIdIn;
+
+            if (calibrationMode === 'single_phase') {
+                let hvDisplay = '';
+                let lvDisplay = '';
+                
+                if (selectedPhase === 'A') {
+                    hvDisplay = `IA: ${I1_per_In.toFixed(2)} In\nIB: ${(0.00).toFixed(2)} In\nIC: ${(-I1_per_In).toFixed(2)} In`;
+                    lvDisplay = `Ia: ${I2_per_In.toFixed(2)} In\nIb: ${(0.00).toFixed(2)} In\nIc: ${(-I1_per_In).toFixed(2)} In`;
+                } else if (selectedPhase === 'B') {
+                    hvDisplay = `IA: ${(-I1_per_In).toFixed(2)} In\nIB: ${I1_per_In.toFixed(2)} In\nIC: ${(0.00).toFixed(2)} In`;
+                    lvDisplay = `Ia: ${(-I1_per_In).toFixed(2)} In\nIb: ${I2_per_In.toFixed(2)} In\nIc: ${(0.00).toFixed(2)} In`;
+                } else if (selectedPhase === 'C') {
+                    hvDisplay = `IA: ${(0.00).toFixed(2)} In\nIB: ${(-I1_per_In).toFixed(2)} In\nIC: ${I1_per_In.toFixed(2)} In`;
+                    lvDisplay = `Ia: ${(0.00).toFixed(2)} In\nIb: ${(-I1_per_In).toFixed(2)} In\nIc: ${I2_per_In.toFixed(2)} In`;
+                }
+
+                return `高压侧显示电流:\n${hvDisplay}\n\n低压侧显示电流:\n${lvDisplay}\n\n差动电流:\n${selectedPhase}相差流: ${Id_per_In.toFixed(2)} In`;
+            } else {
+                return `高压侧显示电流:
+IA: ${I1_per_In.toFixed(2)} In
+IB: ${I1_per_In.toFixed(2)} In
+IC: ${I1_per_In.toFixed(2)} In
+
+低压侧显示电流:
+Ia: ${I2_per_In.toFixed(2)} In
+Ib: ${I2_per_In.toFixed(2)} In
+Ic: ${I2_per_In.toFixed(2)} In
+
+差动电流:
+A相差流: ${Id_per_In.toFixed(2)} In
+B相差流: ${Id_per_In.toFixed(2)} In
+C相差流: ${Id_per_In.toFixed(2)} In`;
+            }
+        }
+
+        // 格式化选取点信息
+        function formatSelectedPointInfo(selectedIbIn, selectedIdIn, I1, I2, I1_prime, I2_prime, K1, K2) {
+            return `曲线选取点坐标:
+制动电流 Ib/In = ${selectedIbIn.toFixed(2)}
+差动电流 Id/In = ${selectedIdIn.toFixed(2)}
+
+保护器折算后高低压电流:
+高压侧折算电流 I1 = ${I1.toFixed(2)} A
+低压侧折算电流 I2 = ${I2.toFixed(2)} A
+
+变比校正前高低压电流:
+高压侧电流 (I1*${K1.toFixed(3)}) = ${I1_prime.toFixed(2)} A
+低压侧电流 (I2*${K2.toFixed(3)}) = ${I2_prime.toFixed(2)} A`;
+        }
+
+        // 计算校验结果
+        function getResults() {
+            if (selectedIbIn === null || selectedIdIn === null) {
+                alert('请先选择校验点！');
+                return;
+            }
+
+            const button = document.getElementById('getResultsButton');
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> 计算中...';
+
+            try {
+                // 获取所有参数
+                const calibrationMode = document.querySelector('input[name="calibration_mode"]:checked').value;
+                const selectedPhase = document.querySelector('input[name="selected_phase"]:checked')?.value || 'A';
+                const directionChoice = document.getElementById('direction_choice').value;
+                const IN = parseFloat(document.getElementById('IN').value);
+                const K1 = parseFloat(document.getElementById('K1').value);
+                const K2 = parseFloat(document.getElementById('K2').value);
+
+                // 计算通用电流
+                const { I1, I2, I1_prime, I2_prime } = calculateCommonCurrents(selectedIbIn, selectedIdIn, IN, K1, K2);
+
+                // 计算校验电流
+                let calibrationCurrentsText;
+                if (calibrationMode === 'single_phase') {
+                    calibrationCurrentsText = calculateSinglePhaseTestCurrents(
+                        selectedIbIn, selectedIdIn, directionChoice, IN, K1, K2, selectedPhase
+                    );
+                } else {
+                    calibrationCurrentsText = calculateThreePhaseTestCurrents(
+                        selectedIbIn, selectedIdIn, directionChoice, IN, K1, K2
+                    );
+                }
+
+                // 格式化保护器显示电流
+                const relayDisplayText = formatRelayDisplayCurrents(
+                    calibrationMode, selectedPhase, I1, I2, IN, selectedIdIn
+                );
+
+                // 格式化选取点信息
+                const selectedPointInfoText = formatSelectedPointInfo(
+                    selectedIbIn, selectedIdIn, I1, I2, I1_prime, I2_prime, K1, K2
+                );
+
+                // 更新显示
+                document.getElementById('calibrationCurrentsBox').textContent = calibrationCurrentsText;
+                document.getElementById('relayDisplayCurrentsBox').textContent = relayDisplayText;
+                document.getElementById('selectedPointInfoContent').textContent = selectedPointInfoText;
+                document.getElementById('selectedPointInfoOutput').classList.remove('hidden');
+
+                button.disabled = false;
+                button.innerHTML = '重新计算结果';
+
+            } catch (error) {
+                console.error('计算错误:', error);
+                document.getElementById('calibrationCurrentsBox').innerHTML = 
+                    '<div class="error">计算过程中发生错误，请检查输入参数</div>';
+                
+                button.disabled = false;
+                button.innerHTML = '计算校验结果';
+            }
+        }
+    </script>
+</body>
 </html>
