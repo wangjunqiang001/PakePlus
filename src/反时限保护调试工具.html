@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反时限保护调试工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .dynamic-inputs {
+            background: #e8f4fd;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+
+        .generate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-section {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .results-table {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-table h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        tr:hover {
+            background: #e3f2fd;
+            transition: background 0.3s ease;
+        }
+
+        .curve-points {
+            background: #fff3cd;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+
+        .curve-points h4 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .point-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            text-align: center;
+        }
+
+        .point {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .point-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #d68910;
+        }
+
+        .point-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .formula-display {
+            background: #f0f8ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #2196f3;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>反时限保护调试工具</h1>
+            <p>支持ABB REF542和施耐德SEPAM保护器的IDMT特性分析</p>
+        </div>
+
+        <div class="main-content">
+            <div class="control-panel">
+                <div class="form-group">
+                    <label for="protectorType">保护器类型</label>
+                    <select id="protectorType" onchange="updateInputFields()">
+                        <option value="">请选择保护器类型</option>
+                        <option value="abb" selected>ABB REF542</option>
+                        <option value="sepam">施耐德 SEPAM</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="ctPrimary">CT变比 - 一次侧 (A)</label>
+                    <input type="number" id="ctPrimary" placeholder="例如: 300" min="1" value="300">
+                </div>
+
+                <div class="form-group">
+                    <label for="ctSecondary">CT变比 - 二次侧 (A)</label>
+                    <select id="ctSecondary">
+                        <option value="1">1A</option>
+                        <option value="5" selected>5A</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="ratedCurrent">额定电流 (A)</label>
+                    <input type="number" id="ratedCurrent" placeholder="例如: 223" min="1" value="223">
+                </div>
+
+                <div class="form-group">
+                    <label for="curveType">反时限曲线类型</label>
+                    <select id="curveType">
+                        <option value="">请选择曲线类型</option>
+                        <option value="normal" selected>正常反时限 (Normal Inverse)</option>
+                        <option value="very">非常反时限 (Very Inverse)</option>
+                        <option value="extreme">极端反时限 (Extremely Inverse)</option>
+                        <option value="long">长反时限 (Long Time Inverse)</option>
+                    </select>
+                </div>
+
+                <div id="dynamicInputs" class="dynamic-inputs" style="display: none;">
+                    <!-- 动态生成的输入字段 -->
+                </div>
+
+                <button class="generate-btn" onclick="generateCurve()">生成曲线和数据表</button>
+
+                <div id="curvePoints" class="curve-points" style="display: none;">
+                    <h4>关键点动作时间</h4>
+                    <div class="point-info">
+                        <div class="point">
+                            <div class="point-value" id="point2x">--</div>
+                            <div class="point-label">2倍设定值</div>
+                        </div>
+                        <div class="point">
+                            <div class="point-value" id="point5x">--</div>
+                            <div class="point-label">5倍设定值</div>
+                        </div>
+                        <div class="point">
+                            <div class="point-value" id="point10x">--</div>
+                            <div class="point-label">10倍设定值</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="formulaDisplay" class="formula-display" style="display: none;">
+                    <strong>当前使用公式:</strong><br>
+                    <span id="formulaText"></span>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="idmtChart" width="800" height="400"></canvas>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="results-table">
+                <h3>基于整定电流倍数的动作时间</h3>
+                <table id="settingTable">
+                    <thead>
+                        <tr>
+                            <th>倍数</th>
+                            <th>一次电流 (A)</th>
+                            <th>二次电流 (A)</th>
+                            <th>动作时间 (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="results-table">
+                <h3>基于额定电流倍数的动作时间</h3>
+                <table id="ratedTable">
+                    <thead>
+                        <tr>
+                            <th>倍数</th>
+                            <th>一次电流 (A)</th>
+                            <th>二次电流 (A)</th>
+                            <th>动作时间 (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        // 页面加载时初始化默认值
+        window.addEventListener('load', function() {
+            updateInputFields();
+        });
+
+        function updateInputFields() {
+            const protectorType = document.getElementById('protectorType').value;
+            const dynamicInputs = document.getElementById('dynamicInputs');
+            
+            if (!protectorType) {
+                dynamicInputs.style.display = 'none';
+                return;
+            }
+
+            dynamicInputs.style.display = 'block';
+            
+            if (protectorType === 'abb') {
+                dynamicInputs.innerHTML = `
+                    <h4 style="color: #2c3e50; margin-bottom: 15px;">ABB REF542 参数</h4>
+                    <div class="form-group">
+                        <label for="ieb">整定值 Ieb (倍In)</label>
+                        <input type="number" id="ieb" placeholder="例如: 0.65" step="0.01" min="0.01" value="0.65">
+                    </div>
+                    <div class="form-group">
+                        <label for="kValue">时间乘子 K</label>
+                        <input type="number" id="kValue" placeholder="例如: 0.3" step="0.01" min="0.01" value="3">
+                    </div>
+                `;
+            } else if (protectorType === 'sepam') {
+                dynamicInputs.innerHTML = `
+                    <h4 style="color: #2c3e50; margin-bottom: 15px;">施耐德 SEPAM 参数</h4>
+                    <div class="form-group">
+                        <label for="is">整定值 Is (一次电流值 A)</label>
+                        <input type="number" id="is" placeholder="例如: 223" min="1" value="223">
+                    </div>
+                    <div class="form-group">
+                        <label for="actionTime">动作时间 (10 Is时的动作时间 s)</label>
+                        <input type="number" id="actionTime" placeholder="例如: 1.65" step="0.01" min="0.01" value="1.65">
+                    </div>
+                `;
+            }
+        }
+
+        function calculateIDMTTime(current, settingCurrent, curveType, protectorType, params) {
+            const ratio = current / settingCurrent;
+            let time = 0;
+            
+            if (protectorType === 'abb') {
+                const k = params.k;
+                switch (curveType) {
+                    case 'normal':
+                        time = (0.14 * k) / (Math.pow(ratio, 0.02) - 1);
+                        break;
+                    case 'very':
+                        time = (13.5 * k) / (ratio - 1);
+                        break;
+                    case 'extreme':
+                        time = (80 * k) / (Math.pow(ratio, 2) - 1);
+                        break;
+                    case 'long':
+                        time = (120 * k) / (ratio - 1);
+                        break;
+                }
+            } else if (protectorType === 'sepam') {
+                // 根据10倍Is时的动作时间反推TMS
+                const actionTimeAt10Is = params.actionTimeAt10Is;
+                let tms = 0;
+                
+                switch (curveType) {
+                    case 'normal':
+                        tms = actionTimeAt10Is * (Math.pow(10, 0.02) - 1) / 0.14;
+                        time = (0.14 * tms) / (Math.pow(ratio, 0.02) - 1);
+                        break;
+                    case 'very':
+                        tms = actionTimeAt10Is * (10 - 1) / 13.5;
+                        time = (13.5 * tms) / (ratio - 1);
+                        break;
+                    case 'extreme':
+                        tms = actionTimeAt10Is * (Math.pow(10, 2) - 1) / 80;
+                        time = (80 * tms) / (Math.pow(ratio, 2) - 1);
+                        break;
+                    case 'long':
+                        tms = actionTimeAt10Is * (10 - 1) / 120;
+                        time = (120 * tms) / (ratio - 1);
+                        break;
+                }
+            }
+            
+            return time > 0 ? time : Infinity;
+        }
+
+        function getFormulaText(curveType, protectorType) {
+            if (protectorType === 'abb') {
+                switch (curveType) {
+                    case 'normal':
+                        return 't = 0.14×K / ((I/Ieb)^0.02 - 1)';
+                    case 'very':
+                        return 't = 13.5×K / (I/Ieb - 1)';
+                    case 'extreme':
+                        return 't = 80×K / ((I/Ieb)² - 1)';
+                    case 'long':
+                        return 't = 120×K / (I/Ieb - 1)';
+                }
+            } else if (protectorType === 'sepam') {
+                switch (curveType) {
+                    case 'normal':
+                        return 't = 0.14×TMS / ((I/Is)^0.02 - 1)';
+                    case 'very':
+                        return 't = 13.5×TMS / (I/Is - 1)';
+                    case 'extreme':
+                        return 't = 80×TMS / ((I/Is)² - 1)';
+                    case 'long':
+                        return 't = 120×TMS / (I/Is - 1)';
+                }
+            }
+            return '';
+        }
+
+        function generateCurve() {
+            // 获取输入参数
+            const protectorType = document.getElementById('protectorType').value;
+            const ctPrimary = parseFloat(document.getElementById('ctPrimary').value);
+            const ctSecondary = parseFloat(document.getElementById('ctSecondary').value);
+            const ratedCurrent = parseFloat(document.getElementById('ratedCurrent').value);
+            const curveType = document.getElementById('curveType').value;
+
+            if (!protectorType || !ctPrimary || !ctSecondary || !ratedCurrent || !curveType) {
+                alert('请填写所有必需参数！');
+                return;
+            }
+
+            let settingCurrent, params;
+            
+            if (protectorType === 'abb') {
+                const ieb = parseFloat(document.getElementById('ieb').value);
+                const kValue = parseFloat(document.getElementById('kValue').value);
+                
+                if (!ieb || !kValue) {
+                    alert('请填写ABB参数！');
+                    return;
+                }
+                
+                settingCurrent = ieb * ctSecondary * (ctPrimary / ctSecondary); // 转换为一次电流
+                params = { k: kValue };
+            } else if (protectorType === 'sepam') {
+                const is = parseFloat(document.getElementById('is').value);
+                const actionTime = parseFloat(document.getElementById('actionTime').value);
+                
+                if (!is || !actionTime) {
+                    alert('请填写SEPAM参数！');
+                    return;
+                }
+                
+                settingCurrent = is;
+                params = { actionTimeAt10Is: actionTime };
+            }
+
+            // 生成曲线数据
+            const currentRange = [];
+            const timeData = [];
+            
+            for (let i = 1.1; i <= 10; i += 0.1) {
+                const current = settingCurrent * i;
+                const time = calculateIDMTTime(current, settingCurrent, curveType, protectorType, params);
+                
+                if (time < 100) { // 限制最大时间为100秒以便显示
+                    currentRange.push(i);
+                    timeData.push(time);
+                }
+            }
+
+            // 绘制图表
+            const ctx = document.getElementById('idmtChart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: currentRange.map(x => x.toFixed(1)),
+                    datasets: [{
+                        label: '动作时间 (s)',
+                        data: timeData,
+                        borderColor: 'rgb(102, 126, 234)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        pointRadius: 2,
+                        pointHoverRadius: 6,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${protectorType.toUpperCase()} ${curveType} 反时限特性曲线`,
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '电流倍数 (相对于设定值)'
+                            },
+                            type: 'linear'
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '动作时间 (秒)'
+                            },
+                            type: 'logarithmic'
+                        }
+                    }
+                }
+            });
+
+            // 显示关键点
+            const point2x = calculateIDMTTime(settingCurrent * 2, settingCurrent, curveType, protectorType, params);
+            const point5x = calculateIDMTTime(settingCurrent * 5, settingCurrent, curveType, protectorType, params);
+            const point10x = calculateIDMTTime(settingCurrent * 10, settingCurrent, curveType, protectorType, params);
+
+            document.getElementById('point2x').textContent = point2x.toFixed(2) + 's';
+            document.getElementById('point5x').textContent = point5x.toFixed(2) + 's';
+            document.getElementById('point10x').textContent = point10x.toFixed(2) + 's';
+            document.getElementById('curvePoints').style.display = 'block';
+
+            // 显示公式
+            document.getElementById('formulaText').textContent = getFormulaText(curveType, protectorType);
+            document.getElementById('formulaDisplay').style.display = 'block';
+
+            // 生成数据表
+            generateTables(settingCurrent, ratedCurrent, curveType, protectorType, params, ctPrimary, ctSecondary);
+            
+            document.getElementById('resultsSection').style.display = 'grid';
+        }
+
+        function generateTables(settingCurrent, ratedCurrent, curveType, protectorType, params, ctPrimary, ctSecondary) {
+            const ctRatio = ctPrimary / ctSecondary;
+            
+            // 基于整定电流倍数的表格
+            const settingTableBody = document.querySelector('#settingTable tbody');
+            settingTableBody.innerHTML = '';
+            
+            for (let i = 1; i <= 10; i++) {
+                const primaryCurrent = settingCurrent * i;
+                const secondaryCurrent = primaryCurrent / ctRatio;
+                const time = calculateIDMTTime(primaryCurrent, settingCurrent, curveType, protectorType, params);
+                
+                const row = settingTableBody.insertRow();
+                row.insertCell(0).textContent = i;
+                row.insertCell(1).textContent = primaryCurrent.toFixed(1);
+                row.insertCell(2).textContent = secondaryCurrent.toFixed(3);
+                row.insertCell(3).textContent = time < 100 ? time.toFixed(3) : '> 100';
+            }
+
+            // 基于额定电流倍数的表格
+            const ratedTableBody = document.querySelector('#ratedTable tbody');
+            ratedTableBody.innerHTML = '';
+            
+            for (let i = 1; i <= 10; i++) {
+                const primaryCurrent = ratedCurrent * i;
+                const secondaryCurrent = primaryCurrent / ctRatio;
+                const time = calculateIDMTTime(primaryCurrent, settingCurrent, curveType, protectorType, params);
+                
+                const row = ratedTableBody.insertRow();
+                row.insertCell(0).textContent = i;
+                row.insertCell(1).textContent = primaryCurrent.toFixed(1);
+                row.insertCell(2).textContent = secondaryCurrent.toFixed(3);
+                row.insertCell(3).textContent = time < 100 ? time.toFixed(3) : '> 100';
+            }
+        }
+    </script>
+</body>
+</html>
