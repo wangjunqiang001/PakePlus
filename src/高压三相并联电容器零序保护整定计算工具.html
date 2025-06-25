@@ -1,0 +1,765 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电容器保护整定计算工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #5b6cee 0%, #6d48c9 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #2d3748;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+
+        .input-section {
+            padding: 40px;
+            background: #f9fafb;
+            border-right: 1px solid #e2e8f0;
+            position: relative;
+        }
+
+        .result-section {
+            padding: 40px;
+            background: white;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            background: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        .radio-option:hover {
+            background-color: #f1f5f9;
+        }
+
+        .radio-option input[type="radio"] {
+            width: auto;
+            margin-right: 8px;
+        }
+
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #5b6cee 0%, #6d48c9 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(91, 108, 238, 0.4);
+        }
+
+        .calculate-btn.loading::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid white;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-item {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 12px;
+            border-left: 4px solid #4facfe;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            font-size: 1.2rem;
+            color: #1a202c;
+            font-family: 'Consolas', monospace;
+        }
+
+        .warning {
+            background: #fed7d7;
+            border-left-color: #e53e3e;
+            color: #c53030;
+        }
+
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #e53e3e;
+            position: absolute;
+            top: 20px;
+            width: calc(100% - 80px);
+        }
+
+        .info-section {
+            background: #e6fffa;
+            border-left: 4px solid #38b2ac;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 12px;
+        }
+
+        .info-section h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .info-section p {
+            color: #4a5568;
+            line-height: 1.6;
+        }
+
+        .formula-display {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9rem;
+            color: #2d3748;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-section {
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .form-group input,
+            .form-group select {
+                font-size: 0.95rem;
+            }
+
+            .calculate-btn {
+                font-size: 1rem;
+            }
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4facfe;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>电容器保护整定计算工具</h1>
+            <p>适用于单星型和双星型接线的高压电容器保护整定计算</p>
+        </div>
+
+        <div class="main-content">
+            <div class="input-section">
+                <h2 class="section-title">参数输入</h2>
+                
+                <div class="info-section">
+                    <h3>使用说明</h3>
+                    <p>本工具支持零序电压保护和中性线不平衡电流保护的整定计算。请根据实际电容器组配置填写参数，确保 PT 变比格式正确（如 6.6/√3 / 0.1 / 3）。</p>
+                </div>
+
+                <form id="calculatorForm">
+                    <div id="error-container"></div>
+
+                    <div class="form-group">
+                        <label>电容器类型</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="fused" name="capacitor_type" value="fused" checked>
+                                <label for="fused">有熔丝</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="fuseless" name="capacitor_type" value="fuseless">
+                                <label for="fuseless">无熔丝</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="N">串联台数 N（每相电容器的串联段数）</label>
+                        <input type="number" id="N" name="N" value="2" min="1" step="1" placeholder="例如：2" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="M">并联台数 M（每相各串联段并联的电容器台数）</label>
+                        <input type="number" id="M" name="M" value="10" min="1" step="1" placeholder="例如：10" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="U_ph">系统额定线电压 U_L (kV)</label>
+                        <input type="number" id="U_ph" name="U_ph" value="6" min="0.001" step="0.001" placeholder="例如：6" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="Q_total_3phase">总容量 Q_3φ (kvar)</label>
+                        <input type="number" id="Q_total_3phase" name="Q_total_3phase" value="1200" min="1" step="0.01" placeholder="例如：1200" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="PT_ratio">PT 变比</label>
+                        <input type="text" id="PT_ratio" name="PT_ratio" value="6.6/√3 / 0.1 / 3" placeholder="例如：6.6/√3 / 0.1 / 3" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="n_TA">CT 变比</label>
+                        <input type="text" id="n_TA" name="n_TA" value="20/5" placeholder="例如：20/5" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="K_sen">灵敏系数 K_sen</label>
+                        <input type="number" id="K_sen" name="K_sen" value="1.5" min="0.01" step="0.01" placeholder="例如：1.5" required>
+                    </div>
+
+                    <div class="form-group" id="fused_group">
+                        <label for="K_fused">熔断罐体数量 K</label>
+                        <input type="number" id="K_fused" name="K_fused" value="1" min="1" step="1" placeholder="例如：1" required>
+                    </div>
+
+                    <div class="form-group" id="fuseless_group" style="display: none;">
+                        <label for="beta_fuseless">击穿百分比 β (%)</label>
+                        <input type="number" id="beta_fuseless" name="beta_fuseless" value="5" min="0.01" max="99.99" step="0.01" placeholder="例如：5" required>
+                    </div>
+
+                    <button type="submit" class="calculate-btn">计算保护整定值</button>
+                </form>
+            </div>
+
+            <div class="result-section">
+                <h2 class="section-title">计算结果</h2>
+                <div id="results">
+                    <div class="info-section">
+                        <p>请填写左侧参数并点击计算按钮获取结果。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 切换电容器类型时显示/隐藏相应输入框
+        document.querySelectorAll('input[name="capacitor_type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const fusedGroup = document.getElementById('fused_group');
+                const fuselessGroup = document.getElementById('fuseless_group');
+                
+                if (this.value === 'fused') {
+                    fusedGroup.style.display = 'block';
+                    fuselessGroup.style.display = 'none';
+                } else {
+                    fusedGroup.style.display = 'none';
+                    fuselessGroup.style.display = 'block';
+                }
+            });
+        });
+
+        // 解析变比字符串
+        function parseRatio(ratioStr) {
+            try {
+                // 清理输入，去除多余空格
+                ratioStr = ratioStr.trim().replace(/\s+/g, '');
+                console.log('Raw input:', ratioStr);
+                
+                // 替换 √3 为 Math.sqrt(3)，√ 为 Math.sqrt
+                let expression = ratioStr.replace(/√3/g, 'Math.sqrt(3)').replace(/√/g, 'Math.sqrt');
+                console.log('Processed expression:', expression);
+                
+                // 分割表达式，按除号分割
+                const parts = expression.split('/').map(part => part.trim());
+                console.log('Parsed parts:', parts);
+                
+                if (parts.length < 2) {
+                    throw new Error('变比格式错误，至少需要一个除号');
+                }
+                
+                // 评估每个部分
+                const values = parts.map((part, index) => {
+                    const value = eval(part);
+                    if (isNaN(value) || !isFinite(value)) {
+                        throw new Error(`无效的表达式部分：${part} at index ${index}`);
+                    }
+                    console.log(`Part ${index}: ${part} = ${value}`);
+                    return value;
+                });
+                
+                // 处理变比
+                let result;
+                if (values.length === 2) {
+                    // 简单变比，如 20/5
+                    result = values[0] / values[1];
+                } else if (values.length === 4) {
+                    // PT 变比，如 6.6/√3 / 0.1 / 3 = (6.6 / √3) * (3 / 0.1)
+                    result = (values[0] / values[1]) * (values[3] / values[2]);
+                } else {
+                    throw new Error(`不支持的变比格式，部分数量为 ${values.length}`);
+                }
+                
+                if (result <= 0) {
+                    throw new Error('变比值必须大于零');
+                }
+                
+                // 警告而不是错误，允许测试
+                let warning = null;
+                if (result < 50 || result > 200) {
+                    warning = `变比值 ${result.toFixed(2)} 可能不合理，典型范围为 50-200`;
+                }
+                
+                console.log('Final PT_ratio_value:', result.toFixed(2));
+                return { value: result, warning: warning };
+            } catch (e) {
+                throw new Error(`变比格式错误，请检查输入格式（如 6.6/√3 / 0.1 / 3）：${e.message}`);
+            }
+        }
+
+        // 验证输入数据
+        function validateInputs(data) {
+            const errors = [];
+            
+            // 检查正数
+            const positiveFields = ['N', 'M', 'U_ph', 'Q_total_3phase', 'K_sen'];
+            positiveFields.forEach(field => {
+                if (data[field] <= 0) {
+                    errors.push(`${field} 必须大于零`);
+                }
+            });
+            
+            // 检查熔断罐体数量
+            if (data.capacitor_type === 'fused') {
+                if (data.K_fused <= 0 || data.K_fused > data.M) {
+                    errors.push('熔断罐体数量 K 必须大于零且不能大于并联台数 M');
+                }
+            }
+            
+            // 检查击穿百分比
+            if (data.capacitor_type === 'fuseless') {
+                if (data.beta_fuseless <= 0 || data.beta_fuseless >= 100) {
+                    errors.push('击穿百分比 β 必须在 0 到 99.99 之间');
+                }
+            }
+            
+            return errors;
+        }
+
+        // 计算零序电压保护
+        function calculateZeroSequenceVoltage(data) {
+            const U_NX = data.U_ph / Math.sqrt(3); // 相电压
+            let U_CH; // 3U₀
+            
+            if (data.capacitor_type === 'fused') {
+                // 有熔丝: U_CH = 3 × K × U_NX / (3 × N × (M - K) + 2 × K)
+                const K = data.K_fused;
+                const denominator = 3 * data.N * (data.M - K) + 2 * K;
+                if (denominator === 0) {
+                    throw new Error('计算分母为零，请检查参数配置');
+                }
+                U_CH = (3 * K * U_NX) / denominator;
+            } else {
+                // 无熔丝: U_CH = 3 × β × U_NX / (3 × N × [M × (1 - β) + β] - 2 × β)
+                const beta = data.beta_fuseless / 100;
+                const denominator = 3 * data.N * (data.M * (1 - beta) + beta) - 2 * beta;
+                if (denominator === 0) {
+                    throw new Error('计算分母为零，请检查参数配置');
+                }
+                U_CH = (3 * beta * U_NX) / denominator;
+            }
+            
+            // 一次侧电压 (kV)
+            const U_primary = U_CH;
+            
+            // 二次侧定值 (V) - 通过PT变比换算
+            const PT_ratio_result = parseRatio(data.PT_ratio);
+            const PT_ratio_value = PT_ratio_result.value;
+            const U_secondary = (U_primary * 1000) / PT_ratio_value; // kV 转换为 V
+            
+            // 调试信息
+            console.log(`PT_ratio_value: ${PT_ratio_value.toFixed(2)}, U_primary: ${U_primary.toFixed(3)} kV, U_secondary: ${U_secondary.toFixed(3)} V`);
+            
+            return {
+                primary: U_primary,
+                secondary: U_secondary,
+                warning: PT_ratio_result.warning
+            };
+        }
+
+        // 计算中性线不平衡电流保护
+        function calculateNeutralCurrent(data) {
+            // 单台电容器额定电流
+            const I_c = data.Q_total_3phase / (Math.sqrt(3) * data.U_ph * data.M);
+            
+            let I_unbalance; // 不平衡电流
+            let K_min_calculated = null;
+            let warning = null;
+            
+            if (data.capacitor_type === 'fused') {
+                // 有熔丝: I = 3 × M × K × I'_c / (6 × N × (M - K) + 5 × K)
+                const K = data.K_fused;
+                const denominator = 6 * data.N * (data.M - K) + 5 * K;
+                if (denominator === 0) {
+                    throw new Error('计算分母为零，请检查参数配置');
+                }
+                I_unbalance = (3 * data.M * K * I_c) / denominator;
+                
+                // K值下限校验
+                K_min_calculated = (6.6 * data.N * data.M - 5.5) / (12.6 * data.N - 5.5);
+                if (K < K_min_calculated) {
+                    warning = `警告: 输入的K值(${K})小于保护灵敏度所需的最小K值(${K_min_calculated.toFixed(2)})，保护可能不灵敏。`;
+                }
+            } else {
+                // 无熔丝: I = 3 × M × β × I'_c / (6 × N × [M × (1 - β) + β] - 5 × β)
+                const beta = data.beta_fuseless / 100;
+                const denominator = 6 * data.N * (data.M * (1 - beta) + beta) - 5 * beta;
+                if (denominator === 0) {
+                    throw new Error('计算分母为零，请检查参数配置');
+                }
+                I_unbalance = (3 * data.M * beta * I_c) / denominator;
+            }
+            
+            // 一次侧电流 (A)
+            const I_primary = I_unbalance;
+            
+            // 二次侧定值 (A) - 通过CT变比和灵敏系数换算
+            const CT_ratio_result = parseRatio(data.n_TA);
+            const CT_ratio_value = CT_ratio_result.value;
+            const I_secondary = I_primary / (data.K_sen * CT_ratio_value);
+            
+            return {
+                primary: I_primary,
+                secondary: I_secondary,
+                warning: warning || CT_ratio_result.warning,
+                K_min: K_min_calculated
+            };
+        }
+
+        // 计算串联段承受电压百分比
+        function calculateVoltagePercentage(data) {
+            let percentage;
+            
+            if (data.capacitor_type === 'fused') {
+                // 有熔丝情况下的电压分配
+                const K = data.K_fused;
+                percentage = (data.N * data.M) / ((data.N - 1) * (data.M - K) + data.M) * 100;
+            } else {
+                // 无熔丝情况下的电压分配
+                const beta = data.beta_fuseless / 100;
+                percentage = data.N / ((data.N - 1) * (1 - beta) + 1) * 100;
+            }
+            
+            return percentage;
+        }
+
+        // 主计算函数
+        function calculate(formData) {
+            try {
+                // 数据验证
+                const errors = validateInputs(formData);
+                if (errors.length > 0) {
+                    throw new Error(errors.join('；'));
+                }
+                
+                // 计算零序电压保护
+                const zeroSeqVoltage = calculateZeroSequenceVoltage(formData);
+                
+                // 计算中性线不平衡电流保护
+                const neutralCurrent = calculateNeutralCurrent(formData);
+                
+                // 计算电压百分比
+                const voltagePercentage = calculateVoltagePercentage(formData);
+                
+                return {
+                    zeroSequenceVoltage: zeroSeqVoltage,
+                    neutralCurrent: neutralCurrent,
+                    voltagePercentage: voltagePercentage,
+                    success: true
+                };
+                
+            } catch (error) {
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+
+        // 显示结果
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = '';
+            
+            if (!results.success) {
+                errorContainer.innerHTML = `
+                    <div class="error">
+                        <strong>计算错误:</strong> ${results.error}
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="info-section">
+                    <h3>计算公式</h3>
+                    <p>零序电压 (3U₀) 计算公式：</p>
+                    <div class="formula-display">
+                        有熔丝: U₀ = 3 × K × Uₙₓ / (3 × N × (M - K) + 2 × K)<br>
+                        无熔丝: U₀ = 3 × β × Uₙₓ / (3 × N × [M × (1 - β) + β] - 2 × β)
+                    </div>
+                    <p>故障串联段电压升高百分比：</p>
+                    <div class="formula-display">
+                        有熔丝: Percentage = (N × M) / [(N - 1) × (M - K) + M] × 100%<br>
+                        无熔丝: Percentage = N / [(N - 1) × (1 - β) + 1] × 100%
+                    </div>
+                </div>
+            `;
+            
+            // 零序电压保护结果
+            html += `
+                <div class="result-item">
+                    <div class="result-label">零序电压 (一次侧)</div>
+                    <div class="result-value">${results.zeroSequenceVoltage.primary.toFixed(3)} kV</div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">零序电压 (二次侧定值)</div>
+                    <div class="result-value">${results.zeroSequenceVoltage.secondary.toFixed(3)} V</div>
+                </div>
+            `;
+            
+            if (results.zeroSequenceVoltage.warning) {
+                html += `
+                    <div class="result-item warning">
+                        <div class="result-label">零序电压保护警告</div>
+                        <div class="result-value">${results.zeroSequenceVoltage.warning}</div>
+                    </div>
+                `;
+            }
+            
+            // 中性线不平衡电流保护结果
+            html += `
+                <div class="result-item">
+                    <div class="result-label">中性线不平衡电流 (一次侧)</div>
+                    <div class="result-value">${results.neutralCurrent.primary.toFixed(3)} A</div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">中性线不平衡电流 (二次侧定值)</div>
+                    <div class="result-value">${results.neutralCurrent.secondary.toFixed(3)} A</div>
+                </div>
+            `;
+            
+            if (results.neutralCurrent.warning) {
+                html += `
+                    <div class="result-item warning">
+                        <div class="result-label">中性线不平衡电流保护警告</div>
+                        <div class="result-value">${results.neutralCurrent.warning}</div>
+                    </div>
+                `;
+            }
+            
+            // 电压百分比
+            html += `
+                <div class="result-item">
+                    <div class="result-label">故障串联段承受电压升高百分比</div>
+                    <div class="result-value">${results.voltagePercentage.toFixed(2)}%</div>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        // 表单提交处理
+        document.getElementById('calculatorForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const calculateBtn = this.querySelector('.calculate-btn');
+            calculateBtn.classList.add('loading');
+            calculateBtn.disabled = true;
+            
+            setTimeout(() => {
+                const formData = new FormData(this);
+                const data = {};
+                
+                // 收集表单数据
+                for (let [key, value] of formData.entries()) {
+                    if (key === 'capacitor_type') {
+                        data[key] = value;
+                    } else if (key === 'PT_ratio' || key === 'n_TA') {
+                        data[key] = value;
+                    } else {
+                        data[key] = parseFloat(value);
+                    }
+                }
+                
+                // 根据电容器类型设置对应的K或β值
+                if (data.capacitor_type === 'fused') {
+                    data.K_fused = data.K_fused || parseFloat(document.getElementById('K_fused').value);
+                    data.beta_fuseless = 0; // 默认值
+                } else {
+                    data.beta_fuseless = data.beta_fuseless || parseFloat(document.getElementById('beta_fuseless').value);
+                    data.K_fused = 1; // 默认值
+                }
+                
+                // 执行计算并显示结果
+                const results = calculate(data);
+                displayResults(results);
+                
+                calculateBtn.classList.remove('loading');
+                calculateBtn.disabled = false;
+            }, 300); // 模拟计算延迟
+        });
+    </script>
+</body>
+</html>
