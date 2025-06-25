@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高压三相并联电容器参数计算器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 750px;
+            margin: 30px auto;
+        }
+        h2 {
+            color: #0056b3;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        h3 {
+            color: #007bff;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input[type="number"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .note {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result-section {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .result-item {
+            background-color: #e9f7ff;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-left: 5px solid #007bff;
+            border-radius: 4px;
+        }
+        .result-item strong {
+            color: #0056b3;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .applicability-note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #856404;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #777;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>高压三相并联电容器参数计算器</h2>
+
+        <div class="applicability-note">
+            <strong>注意：</strong>本程序适用于高压三相并联电容器组。如果每相内部包含多个电容器串联，请在下方“每相串联的电容器数量”中填写对应的数量。
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <form id="capacitorForm">
+            <h3>电容器组配置：</h3>
+            <div class="input-group">
+                <label for="num_capacitors_total">三相电容器总数量 (台):</label>
+                <input type="number" id="num_capacitors_total" value="" required>
+                <div class="note">请填写三相回路中所有电容器的总和。例如，如果每相串联5台，共3相，则总数量为15台。</div>
+            </div>
+            <div class="input-group">
+                <label for="num_series_per_phase">每相串联的电容器数量 (台):</label>
+                <input type="number" id="num_series_per_phase" value="1" required>
+                <div class="note">请填写每相内部有多少台电容器串联连接。如果每相直接并联到母线，则填写1。</div>
+            </div>
+
+            <h3>电容器铭牌参数：</h3>
+            <div class="input-group">
+                <label for="rated_capacity_single">单台电容器额定容量 (kVar):</label>
+                <input type="number" id="rated_capacity_single" value="" step="any" required>
+            </div>
+            <div class="input-group">
+                <label id="rated_voltage_single_label" for="rated_voltage_single">单台电容器额定线电压 (kV):</label>
+                <input type="number" id="rated_voltage_single" value="" step="0.001" required>
+                <div class="note" id="rated_voltage_single_note">请填写单台电容器铭牌上标注的额定电压，当每相串联数量为1时，此通常指其额定线电压。例如，6.6kV。</div>
+            </div>
+
+            <h3>系统运行参数：</h3>
+            <div class="input-group">
+                <label for="system_op_voltage">系统实际运行线电压 (kV):</label>
+                <input type="number" id="system_op_voltage" value="6.2" step="0.1" required>
+                <div class="note">电容器组接入点的实际测量线电压。</div>
+            </div>
+            <div class="input-group">
+                <label for="actual_capacitance_single">单台电容器实测电容 (μF) <span class="note">(可选，不填则使用额定值计算)</span>:</label>
+                <input type="number" id="actual_capacitance_single" step="0.1" value="">
+                <div class="note">如果铭牌上没有标注电容值或您有实测数据，请填写。</div>
+            </div>
+
+            <button type="submit">计算</button>
+        </form>
+
+        <div class="result-section" id="results">
+            <h3>计算结果：</h3>
+            <div class="result-item"><strong>单台电容器额定电容:</strong> <span id="Cn_single"></span> μF</div>
+            <div class="result-item"><strong>电容器组额定总容量:</strong> <span id="Qn_total"></span> kVar</div>
+            <div class="result-item"><strong>电容器组额定电流:</strong> <span id="In_total"></span> A</div>
+            <div class="result-item"><strong>电容器组总实际运行容量:</strong> <span id="Qop_total"></span> kVar</div>
+            <div class="result-item"><strong>电容器组总实际运行电流:</strong> <span id="Iop_total"></span> A</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        制作人：王俊强
+    </div>
+
+    <script>
+        const FREQUENCY_HZ = 50; // 固定频率为 50 Hz
+
+        // 获取 DOM 元素
+        const numSeriesPerPhaseInput = document.getElementById('num_series_per_phase');
+        const ratedCapacitySingleInput = document.getElementById('rated_capacity_single');
+        const ratedVoltageSingleLabel = document.getElementById('rated_voltage_single_label');
+        const ratedVoltageSingleInput = document.getElementById('rated_voltage_single');
+        const ratedVoltageSingleNote = document.getElementById('rated_voltage_single_note');
+        const actualCapacitanceSingleInput = document.getElementById('actual_capacitance_single');
+        const numCapacitorsTotalInput = document.getElementById('num_capacitors_total');
+
+
+        // --- 动态调整输入框的预设值、标签和提示 ---
+        function updateInputFieldsBasedOnSeriesNum() {
+            const numSeries = parseInt(numSeriesPerPhaseInput.value);
+
+            // 无论串联数量为何值，实测电容预设值都为空
+            actualCapacitanceSingleInput.value = '';
+
+            if (numSeries === 1) {
+                // 情况1: 每相串联数量为1 (即直接并联)
+                ratedCapacitySingleInput.value = 100;
+                ratedVoltageSingleInput.value = 6.6;
+                numCapacitorsTotalInput.value = 6; // 默认6台，例如3相每相2台并联
+
+                ratedVoltageSingleLabel.textContent = '单台电容器额定线电压 (kV):';
+                ratedVoltageSingleNote.innerHTML = '请填写单台电容器铭牌上标注的额定电压，当每相串联数量为1时，此通常指其额定线电压。例如，6.6kV。';
+            } else {
+                // 情况2: 每相串联数量不为1 (即内部有串联)
+                ratedCapacitySingleInput.value = 26.7;
+                ratedVoltageSingleInput.value = 0.762;
+                numCapacitorsTotalInput.value = 15; // 默认15台，例如3相每相串联5台
+
+                ratedVoltageSingleLabel.textContent = '单台电容器额定相电压 (kV):';
+                ratedVoltageSingleNote.innerHTML = '请填写单台电容器铭牌上标注的额定电压，通常指其耐压的相电压（即其两端承受的电压）。例如，甲醇一期电容器电压0.762kV。';
+            }
+        }
+
+        // 页面加载时执行一次，设置初始预设值
+        updateInputFieldsBasedOnSeriesNum();
+
+        // 监听“每相串联的电容器数量”输入框的变化
+        numSeriesPerPhaseInput.addEventListener('input', updateInputFieldsBasedOnSeriesNum);
+
+
+        // --- 表单提交和计算逻辑 ---
+        document.getElementById('capacitorForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // 阻止表单默认提交行为
+
+            const errorMessageDiv = document.getElementById('errorMessage');
+            errorMessageDiv.textContent = ''; // 清除之前的错误信息
+
+            // 获取输入值
+            const ratedCapacitySingle = parseFloat(ratedCapacitySingleInput.value); // kVar
+            const ratedVoltageSingle = parseFloat(ratedVoltageSingleInput.value); // kV (单台铭牌电压)
+            const numCapacitorsTotal = parseInt(numCapacitorsTotalInput.value); // 总台数
+            const numSeriesPerPhase = parseInt(numSeriesPerPhaseInput.value); // 每相串联数量
+            const systemOpVoltage = parseFloat(document.getElementById('system_op_voltage').value); // kV (实际运行线电压)
+            const actualCapacitanceSingle = parseFloat(actualCapacitanceSingleInput.value); // μF (可选)
+
+
+            // 简单的输入验证
+            if (isNaN(ratedCapacitySingle) || isNaN(ratedVoltageSingle) || isNaN(numCapacitorsTotal) ||
+                isNaN(numSeriesPerPhase) || isNaN(systemOpVoltage)) {
+                errorMessageDiv.textContent = '请确保所有必填字段都已填写正确！';
+                return;
+            }
+            if (ratedCapacitySingle <= 0 || ratedVoltageSingle <= 0 || numCapacitorsTotal <= 0 ||
+                numSeriesPerPhase <= 0 || systemOpVoltage <= 0) {
+                errorMessageDiv.textContent = '所有输入值必须大于零！';
+                return;
+            }
+
+            // 检查数量逻辑是否合理
+            if (numCapacitorsTotal % 3 !== 0) {
+                errorMessageDiv.textContent = '三相电容器总数量必须是3的倍数！';
+                return;
+            }
+            const numCapacitorsPerPhase = numCapacitorsTotal / 3;
+            if (numCapacitorsPerPhase % numSeriesPerPhase !== 0) {
+                errorMessageDiv.textContent = '每相总数量（总数量/3）必须能被每相串联数量整除！请检查输入。';
+                return;
+            }
+            const numParallelStringsPerPhase = numCapacitorsPerPhase / numSeriesPerPhase;
+
+
+            const PI = Math.PI;
+            const SQRT3 = Math.sqrt(3);
+
+            // --- A. 额定参数计算 (基于铭牌额定电压 U_N_单台) ---
+
+            // 确定用于计算单台电容的电压值（V）
+            // 如果每相串联数量为1，用户输入的 ratedVoltageSingle 被视为额定线电压，需转换为相电压。
+            // 否则，用户输入的 ratedVoltageSingle 被视为额定相电压。
+            let ratedVoltageSingleForCapacitanceCalc_V;
+            if (numSeriesPerPhase === 1) {
+                ratedVoltageSingleForCapacitanceCalc_V = (ratedVoltageSingle * 1000) / SQRT3;
+            } else {
+                ratedVoltageSingleForCapacitanceCalc_V = ratedVoltageSingle * 1000;
+            }
+
+            // 单台电容器额定电容 (C_N_单台, F)
+            const Cn_single_F = (ratedCapacitySingle * 1000) / (2 * PI * FREQUENCY_HZ * Math.pow(ratedVoltageSingleForCapacitanceCalc_V, 2));
+            const Cn_single_uF = Cn_single_F * 1e6; // 转换为微法
+
+            // 电容器组的额定总容量 (Q_N_总, kVar)
+            const Qn_total = ratedCapacitySingle * numCapacitorsTotal;
+
+            // 电容器组额定线电压 (Rated_Group_Line_Voltage, kV) - 用于计算额定电流
+            // 这个变量依然存在于计算逻辑中，但不再输出
+            let Rated_Group_Line_Voltage;
+            if (numSeriesPerPhase === 1) {
+                 // 如果单台铭牌就是线电压，且每相就一台，那么组额定线电压就是单台额定电压
+                Rated_Group_Line_Voltage = ratedVoltageSingle;
+            } else {
+                // 如果单台铭牌是相电压，且有串联，那么组额定线电压 = 单台相电压 * 串联数量 * sqrt(3)
+                Rated_Group_Line_Voltage = ratedVoltageSingle * numSeriesPerPhase * SQRT3;
+            }
+
+
+            // 电容器组的额定电流 (I_N_总, A)
+            // 这是电容器组在 Rated_Group_Line_Voltage 下的电流
+            const In_total = (Qn_total * 1000) / (SQRT3 * Rated_Group_Line_Voltage * 1000);
+
+
+            // --- B. 实际运行参数计算 (基于系统实际运行线电压 U_op_线 和实测电容 C_actual_单台) ---
+
+            // 确定用于计算的实际电容值
+            const C_for_calculation_uF = isNaN(actualCapacitanceSingle) ? Cn_single_uF : actualCapacitanceSingle;
+            const C_for_calculation_F = C_for_calculation_uF * 1e-6; // 转换为法拉
+
+            // 计算每相的等效电容 (F)
+            const C_eq_phase_F = C_for_calculation_F * (numParallelStringsPerPhase / numSeriesPerPhase);
+
+
+            // 系统实际运行相电压 (U_op_相, V)
+            const systemOpVoltagePhase_V = (systemOpVoltage * 1000) / SQRT3;
+
+            // 电容器组的总实际运行容量 (Q_op_总, kVar)
+            const Qop_total_Var = 3 * (2 * PI * FREQUENCY_HZ * C_eq_phase_F * Math.pow(systemOpVoltagePhase_V, 2));
+            const Qop_total_kVar = Qop_total_Var / 1000;
+
+            // 电容器组的总实际运行电流 (I_op_总, A)
+            const Iop_total = (Qop_total_kVar * 1000) / (SQRT3 * systemOpVoltage * 1000);
+
+            // --- 显示结果 ---
+            document.getElementById('Cn_single').textContent = Cn_single_uF.toFixed(3);
+            document.getElementById('Qn_total').textContent = Qn_total.toFixed(2);
+            document.getElementById('In_total').textContent = In_total.toFixed(2);
+            document.getElementById('Qop_total').textContent = Qop_total_kVar.toFixed(2);
+            document.getElementById('Iop_total').textContent = Iop_total.toFixed(2);
+        });
+
+    </script>
+</body>
+</html>
