@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>负载不平衡保护动作特性分析工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .panel h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #34495e;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498db;
+        }
+
+        .result-item strong {
+            color: #2c3e50;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-top: 30px;
+        }
+
+        .formula {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 1.1em;
+            border: 2px solid #bdc3c7;
+        }
+
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ffeaa7;
+            margin: 10px 0;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ 负载不平衡保护动作特性分析工具</h1>
+            <p>Unbalanced Load Protection Analysis Tool</p>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <h2>📊 参数设置</h2>
+                <div class="form-group">
+                    <label for="ctRatio">CT变比 (如: 300/5):</label>
+                    <input type="text" id="ctRatio" value="300/5" placeholder="例: 300/5">
+                </div>
+                <div class="form-group">
+                    <label for="ratedCurrent">二次额定电流 In (A):</label>
+                    <input type="number" id="ratedCurrent" value="5" step="0.1" placeholder="5">
+                </div>
+                <div class="form-group">
+                    <label for="startThreshold">启动阈值 Is (倍数):</label>
+                    <input type="number" id="startThreshold" value="0.1" step="0.01" placeholder="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="thermalParameter">热量参数 K:</label>
+                    <input type="number" id="thermalParameter" value="10" step="0.1" placeholder="10">
+                </div>
+                <div class="form-group">
+                    <label for="testCurrent">测试电流 I2 (A):</label>
+                    <input type="number" id="testCurrent" value="4" step="0.1" placeholder="4">
+                </div>
+                <button class="btn" onclick="calculate()">🔄 计算动作时间</button>
+                <button class="btn" onclick="generateCurve()">📈 生成特性曲线</button>
+            </div>
+
+            <div class="panel">
+                <h2>📋 计算结果</h2>
+                <div class="formula">
+                    t = K / (I2² - Is²)
+                </div>
+                <div id="results" class="results">
+                    <div class="result-item">
+                        <strong>点击计算按钮开始分析</strong>
+                    </div>
+                </div>
+                <div class="warning">
+                    <strong>注意:</strong> 该特性仅适用于 I2/Is ≤ 20 的范围内
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="chart-container">
+            <h2>📈 保护动作特性曲线</h2>
+            <canvas id="protectionChart" width="800" height="400"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        function calculate() {
+            const ctRatio = document.getElementById('ctRatio').value;
+            const ratedCurrent = parseFloat(document.getElementById('ratedCurrent').value);
+            const startThreshold = parseFloat(document.getElementById('startThreshold').value);
+            const thermalParameter = parseFloat(document.getElementById('thermalParameter').value);
+            const testCurrent = parseFloat(document.getElementById('testCurrent').value);
+
+            // 解析CT变比
+            const ctRatioParts = ctRatio.split('/');
+            const ctPrimary = parseFloat(ctRatioParts[0]);
+            const ctSecondary = parseFloat(ctRatioParts[1]);
+            const ctRatioValue = ctPrimary / ctSecondary;
+
+            // 计算参数 (testCurrent就是二次电流)
+            const I2 = testCurrent / ratedCurrent; // 负相序电流标幺值 (二次电流/二次额定电流)
+            const Is = startThreshold; // 启动阈值标幺值
+            const ratio = I2 / Is;
+
+            let actionTime;
+            let limitedByRatio = false;
+
+            // 检查是否超过20倍限制
+            if (ratio > 20) {
+                const I2_limited = Is * 20;
+                actionTime = thermalParameter / (I2_limited * I2_limited - Is * Is);
+                limitedByRatio = true;
+            } else {
+                actionTime = thermalParameter / (I2 * I2 - Is * Is);
+            }
+
+            // 计算复归电流 (二次侧)
+            const resetCurrentSecondary = Is * 0.4 * ratedCurrent;
+            const resetCurrentPrimary = resetCurrentSecondary * ctRatioValue;
+
+            // 测试电流就是二次电流
+            const secondaryTestCurrent = testCurrent;
+
+            // 显示结果
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="result-item">
+                    <strong>负相序电流 I2:</strong> ${I2.toFixed(3)} In (${testCurrent} A 二次)
+                </div>
+                <div class="result-item">
+                    <strong>启动阈值 Is:</strong> ${Is.toFixed(3)} In (${(Is * ratedCurrent).toFixed(1)} A 二次)
+                </div>
+                <div class="result-item">
+                    <strong>电流比值 I2/Is:</strong> ${ratio.toFixed(2)} ${limitedByRatio ? '(受20倍限制)' : ''}
+                </div>
+                <div class="result-item">
+                    <strong>⏱️ 动作时间:</strong> ${actionTime.toFixed(2)} 秒
+                </div>
+                <div class="result-item">
+                    <strong>🔄 复归电流:</strong> ${resetCurrentSecondary.toFixed(2)} A (二次) / ${resetCurrentPrimary.toFixed(1)} A (一次)
+                </div>
+                <div class="result-item">
+                    <strong>🔌 测试电流:</strong> ${secondaryTestCurrent} A (二次) / ${(testCurrent * ctRatioValue).toFixed(1)} A (一次)
+                </div>
+            `;
+        }
+
+
+
+        function generateCurve() {
+            const ratedCurrent = parseFloat(document.getElementById('ratedCurrent').value);
+            const startThreshold = parseFloat(document.getElementById('startThreshold').value);
+            const thermalParameter = parseFloat(document.getElementById('thermalParameter').value);
+
+            const data = [];
+            const labels = [];
+
+            // 生成曲线数据点
+            for (let ratio = 1.1; ratio <= 20; ratio += 0.1) {
+                const I2 = startThreshold * ratio;
+                const actionTime = thermalParameter / (I2 * I2 - startThreshold * startThreshold);
+                
+                if (actionTime > 0 && actionTime < 1000) { // 限制显示范围
+                    labels.push(ratio.toFixed(1));
+                    data.push(actionTime);
+                }
+            }
+
+            const ctx = document.getElementById('protectionChart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '动作时间 (秒)',
+                        data: data,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '负载不平衡保护动作特性曲线',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'I2/Is (倍数)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '动作时间 (秒)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            type: 'logarithmic',
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // 页面加载时初始化
+        window.addEventListener('load', function() {
+            generateCurve();
+        });
+    </script>
+</body>
+</html>
